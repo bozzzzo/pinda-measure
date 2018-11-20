@@ -18,6 +18,7 @@ setup(
     license="GPLv3",
     packages=["pinda_measure"],
     install_requires=install_requires,
+    python_requires='>3.5.2',
     entry_points={
         "console_scripts": [
             "pinda_measure = pinda_measure.command:call_main",

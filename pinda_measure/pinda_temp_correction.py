@@ -2,6 +2,8 @@ import collections
 import datetime
 import itertools
 import pandas as pd
+import numpy as np
+from decimal import Decimal
 
 _PindaTrigger = collections.namedtuple(
     "_PindaTrigger",
@@ -22,18 +24,46 @@ _PindaScanConfig = collections.namedtuple(
     "_PindaScanConfig",
     "X,Y,cycles,temp_range")
 
+_Range = collections.namedtuple("_Range", "start, stop, num")
+
+
+class Range(_Range):
+    def __iter__(self):
+        return iter(tuple(np.linspace(self.start, self.stop, self.num, dtype=Decimal)))
+
+    @classmethod
+    def parse(cls, s : str, default : 'Range') -> 'Range':
+        parts = tuple(map(str.strip, s.split(":")))
+        if len(parts) != 3:
+            raise ValueError("Expected three integers start:end:num")
+        def opt(t,s,d):
+            return t(s) if s else t(d)
+        return cls(
+            opt(float, parts[0], default.start),
+            opt(float, parts[1], default.stop),
+            opt(int, parts[2], default.num))
+
+    def __str__(self):
+        return "{self.start}:{self.stop}:{self.num}".format(self=self)
+
 
 class PindaScanConfig(_PindaScanConfig):
 
-    @staticmethod
-    def default():
+    @classmethod
+    def default(cls) -> 'PindaScanConfig':
         return PindaScanConfig(
-            X=range(0, 211, 30),
-            Y=range(-3, 208, 30),
+            X=Range(0, 210, 5),
+            Y=Range(-3, 207, 5),
             cycles=1,
-            temp_range=range(20,21,5),
+            temp_range=Range(20,20,1),
         )
 
+    def __str__(self):
+        return "{self.__class__.__name__}({args})".format(
+            self=self,
+            args=", ".join(itertools.starmap("{}={}".format,
+                                             zip(self._fields, self))),
+        )
 
 class PindaScan:
 
@@ -57,10 +87,9 @@ class PindaScan:
             nozzle=temps.T.current)
 
     def sweep_area(self):
-        Y = self.config.Y
+        Y = tuple(self.config.Y)
         X = tuple(self.config.X)
-        rX = tuple(reversed(self.config.X))
-        for y,x in zip((i for i in Y for j in X), itertools.cycle((X + rX))):
+        for y,x in zip((i for i in Y for j in X), itertools.cycle((X + X[::-1]))):
             yield x, y
 
     def sweep_bed(self, cycle):
@@ -97,9 +126,9 @@ class PindaScan:
         self.e.move(x=0,y=0,z=50)
         return points
 
-    def save_csv(self, points, filename="results.%Y%m%d%H%M.csv")
+    def save_csv(self, points, filename="results.%Y%m%d%H%M.csv"):
         df = pd.DataFrame.from_records(points, columns=PindaTrigger._fields)
         results = datetime.datetime.now().strftime(filename)
         df.to_csv(results)
-        print("Wrote", results)
+        print("\nWrote", results)
 

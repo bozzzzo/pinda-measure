@@ -11,6 +11,7 @@ Options:
   -t, --temp_range=<trange>  # Bed temperatures to measure at [default: {default.temp_range}]
   -c, --cycles=<cycles>      # number of measurement cycles at each temperature [default: {default.cycles}]
   --num=<num>                # change number of points for X and Y range
+  --port=<port>              # Serial port of the 3d printer [default: /dev/cu.usbmodem1411]
 
 Ranges are expressed as <start>:<end>:<num> with <num> points over the range
 <end> inclusive.
@@ -43,7 +44,7 @@ def parse_config(args):
 
 def measure(args):
     config = parse_config(args)
-    e = Extruder(Port(log=False))
+    e = Extruder(Port(device=args["--port"], log=False))
     p = PindaScan(e, config=config)
     points = p.scan_pinda()
     df = p.save_csv(points)
@@ -63,7 +64,6 @@ def show(df):
 def call_main():
     args = docopt(__doc__.format(default=PindaScanConfig.default()),
                   version='Pinda Measure v0.0')
-    print(args)
     if args["measure"]:
         measure(args)
     elif args["show"]:

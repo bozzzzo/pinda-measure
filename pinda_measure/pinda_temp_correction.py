@@ -1,5 +1,6 @@
 import collections
 import datetime
+import functools
 import itertools
 import pandas as pd
 import numpy as np
@@ -8,7 +9,6 @@ from decimal import Decimal
 _PindaTrigger = collections.namedtuple(
     "_PindaTrigger",
     "cycle,timestamp,X,Y,Z,temp,bed,nozzle,bed_target")
-
 
 class PindaTrigger(_PindaTrigger):
     def __str__(self):
@@ -26,10 +26,38 @@ _PindaScanConfig = collections.namedtuple(
 
 _Range = collections.namedtuple("_Range", "start, stop, num")
 
+@functools.total_ordering
+class Range:
+    def __init__(self, start, stop, num):
+        self.i = _Range(start, stop, num)
 
-class Range(_Range):
+    @property
+    def start(self):
+        return self.i.start
+
+    @property
+    def stop(self):
+        return self.i.stop
+
+    @property
+    def num(self):
+        return self.i.num
+
+    def __eq__(self, other):
+        return self.i == other.i
+
+    def __lt__(self, other):
+        return self.i < other.i
+
+    def __hash__(self):
+        return hash(self.i)
+
     def __iter__(self):
         return iter(tuple(np.linspace(self.start, self.stop, self.num, dtype=Decimal)))
+
+    def _replace(self, **kwargs):
+        i = self.i._replace(**kwargs)
+        return self.__class__(i.start, i.stop, i.num)
 
     @classmethod
     def parse(cls, s : str, default : 'Range') -> 'Range':
@@ -65,6 +93,11 @@ class PindaScanConfig(_PindaScanConfig):
                                              zip(self._fields, self))),
         )
 
+
+def chop_micros(td : datetime.timedelta) -> datetime.timedelta:
+    return type(td)(days=td.days,
+                    seconds=td.seconds)
+
 class PindaScan:
 
     def __init__(self, e, config=PindaScanConfig.default()):
@@ -77,10 +110,10 @@ class PindaScan:
         probe = self.e.bed_probe()
         return PindaTrigger(
             cycle=cycle or 0,
-            timestamp=datetime.datetime.now() - self.start_time,
-            X=probe.X,
-            Y=probe.Y,
-            Z=probe.Z,
+            timestamp=chop_micros(datetime.datetime.now() - self.start_time),
+            X=probe.X.quantize(Decimal('1.00')),
+            Y=probe.Y.quantize(Decimal('1.00')),
+            Z=probe.Z.quantize(Decimal('1.000')),
             bed_target=temps.B.target,
             temp=temps.P.current,
             bed=temps.B.current,
@@ -129,6 +162,6 @@ class PindaScan:
     def save_csv(self, points, filename="results.%Y%m%d%H%M.csv"):
         df = pd.DataFrame.from_records(points, columns=PindaTrigger._fields)
         results = datetime.datetime.now().strftime(filename)
-        df.to_csv(results)
+        df.to_csv(results, index=False)
         print("\nWrote", results)
-
+        return df

@@ -12,7 +12,8 @@ with open(os.path.join(ROOT_DIR, "requirements.txt")) as fp:
 print(install_requires)
 setup(
     name="pinda_measure",
-    version="0.0.1",
+    use_scm_version=True,
+    setup_requires=['setuptools_scm'],
     description="P.I.N.D.A. measurements",
     url="https://github.com/bozzzzo/pinda_measure",
     license="GPLv3",

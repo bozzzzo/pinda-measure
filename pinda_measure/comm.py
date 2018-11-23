@@ -39,9 +39,11 @@ class Port(object):
     def __init__(self, device="/dev/cu.usbmodem1411", log=True):
         self._log = log
         self.port = Serial()
+        self.port.close()
         self.port.port = device
         self.port.baudrate = 115200
         self.port.timeout = 0.25
+        self.port.dtr = True
         self.port.open()
         self.log("port opened")
         self.port.write(";\r\n".encode("ASCII"))

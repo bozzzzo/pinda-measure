@@ -8,11 +8,11 @@ from decimal import Decimal
 
 _PindaTrigger = collections.namedtuple(
     "_PindaTrigger",
-    "cycle,timestamp,X,Y,Z,temp,bed,nozzle,bed_target")
+    "cycle,timestamp,X,Y,X_act,Y_act,Z,temp,bed,nozzle,bed_target")
 
 class PindaTrigger(_PindaTrigger):
     def __str__(self):
-        return "{cycle:4} {timestamp} {X:9} {Y:9} {Z:9} P{temp:6} B{bed:6}/{bed_target:6} T{nozzle:6}".format(**(self._asdict()))
+        return "{cycle:4} {timestamp} {X:9} {Y:9} {X_act:9} {Y_act} {Z:9} P{temp:6} B{bed:6}/{bed_target:6} T{nozzle:6}".format(**(self._asdict()))
 
 
 def pr(*x, spinner=itertools.cycle("-/|\\")):
@@ -57,7 +57,7 @@ class Range:
 
     def _replace(self, **kwargs):
         i = self.i._replace(**kwargs)
-        return self.__class__(i.start, i.stop, i.num)
+        return self.__class__(*i)
 
     @classmethod
     def parse(cls, s : str, default : 'Range') -> 'Range':
@@ -94,9 +94,8 @@ class PindaScanConfig(_PindaScanConfig):
         )
 
 
-def chop_micros(td : datetime.timedelta) -> datetime.timedelta:
-    return type(td)(days=td.days,
-                    seconds=td.seconds)
+def chop_micros(td : datetime.timedelta) -> Decimal:
+    return Decimal(td.total_seconds()).quantize(Decimal('1.00'))
 
 class PindaScan:
 
@@ -105,14 +104,17 @@ class PindaScan:
         self.config = config
         self.start_time = datetime.datetime.now()
 
-    def probe_bed(self, cycle=None):
+    def probe_bed(self, x, y, cycle=None):
+        self.e.move(x=x, y=y)
         temps = self.e.m105()
         probe = self.e.bed_probe()
         return PindaTrigger(
             cycle=cycle or 0,
             timestamp=chop_micros(datetime.datetime.now() - self.start_time),
-            X=probe.X.quantize(Decimal('1.00')),
-            Y=probe.Y.quantize(Decimal('1.00')),
+            X=x,
+            Y=y,
+            X_act=probe.X.quantize(Decimal('1.00')),
+            Y_act=probe.Y.quantize(Decimal('1.00')),
             Z=probe.Z.quantize(Decimal('1.000')),
             bed_target=temps.B.target,
             temp=temps.P.current,
@@ -127,23 +129,19 @@ class PindaScan:
 
     def sweep_bed(self, cycle):
         for x,y in self.sweep_area():
-            self.e.move(x=x, y=y)
-            yield self.probe_bed(cycle=cycle)
+            yield self.probe_bed(x=x, y=y, cycle=cycle)
 
     def sweep_pinda_temp_gradient(self):
         for temp in self.config.temp_range:
-            self.e.move(100,100)
+            self.e.move(50,50)
             self.e.bed_temp(temp, wait=True)
-            for cycle in range(self.config.cycles):
+            for cycle in range(1, self.config.cycles + 1):
                 yield from self.sweep_bed(cycle)
 
     def scan_pinda(self):
         self.e.home_all()
-        self.e.speed = 5000
-        self.e.move(x=0,y=0)
-        self.e.move(x=10,y=10)
-        self.e.move(x=0,y=0)
-        self.e.move(x=10,y=10)
+        self.e.speed = 7000
+        self.e.move(x=5,y=5)
         points = []
         try:
             for point in self.sweep_pinda_temp_gradient():
@@ -153,6 +151,7 @@ class PindaScan:
             print()
             print("Interrupted, result file will be incomplete")
             pass
+        print("\nturning off heaters...")
         self.e.bed_temp(0)
         self.e.hotend_temp(0)
         self.e.part_fan(0)
@@ -164,4 +163,5 @@ class PindaScan:
         results = datetime.datetime.now().strftime(filename)
         df.to_csv(results, index=False)
         print("\nWrote", results)
-        return df
+        return df.astype(float)
+

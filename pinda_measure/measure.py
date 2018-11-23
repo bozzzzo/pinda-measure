@@ -3,14 +3,15 @@ import pandas as pd
 from .comm import Port, FilePort, Extruder
 
 
-def measure(port):
+def measure_G80(port):
     port.command("G80")
     data = port.command("G81")
-    data = map(lambda row: map(float, row), map(str.split, data[-7:]))
+    data = list(
+        reversed(list(
+            map(lambda row: list(map(float, row)),
+                map(str.split, data[-8:-1])))))
     data = pd.DataFrame(data).round(3)
-    m = data.min().min()
-    data = data - m
-    return m, data
+    return data
 
 
 def calibrate_linear_advance(port, k_range):
@@ -80,10 +81,6 @@ def calibrate_linear_advance(port, k_range):
     port.command_block(outro)
 
 
-port = FilePort("K_factor_calibration.gcode")
-
-# data = measure(port)
-# print(data[0])
-# print(data[1])
-
-calibrate_linear_advance(port, range(0, 100, 1))
+if __name__ == "__main__":
+    port = FilePort("K_factor_calibration.gcode")
+    calibrate_linear_advance(port, range(0, 100, 1))

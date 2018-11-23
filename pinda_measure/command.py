@@ -3,7 +3,8 @@ PINDA measurements of repeatability, temperature stability, bed level
 
 Usage:
   pinda_measure measure [options]
-  pinda_measure show <file> [options]
+  pinda_measure show [<file>] [options]
+  pinda_measure compare-G80 [options]
 
 Options:
   -x, --xrange=<xrange>      # X range to measure [default: {default.X}]
@@ -16,11 +17,16 @@ Options:
 Ranges are expressed as <start>:<end>:<num> with <num> points over the range
 <end> inclusive.
 
+if no file is passed to show the youngest csv file in current folder is shown.
+
 """
+import os
+import glob
 from docopt import docopt
 from decimal import Decimal
 from .comm import Extruder, Port
 from .pinda_temp_correction import PindaScan, PindaScanConfig, Range
+from .measure import measure_G80
 
 
 def parse_config(args):
@@ -42,9 +48,12 @@ def parse_config(args):
     print(config)
     return config
 
+def parse_extruder(args):
+    return Extruder(Port(device=args["--port"], log=False))
+
 def measure(args):
     config = parse_config(args)
-    e = Extruder(Port(device=args["--port"], log=False))
+    e = parse_extruder(args)
     p = PindaScan(e, config=config)
     points = p.scan_pinda()
     df = p.save_csv(points)
@@ -53,12 +62,34 @@ def measure(args):
 def load_and_show(args):
     from .visualize_level import load_df
     f = args["<file>"]
+    if f is None:
+        f = sorted(glob.glob("*.csv"), key=os.path.getmtime)[-1]
     df = load_df(f)
     show(df)
 
+def compare_G80(args):
+    from .visualize_level import show_heatmap
+    e = parse_extruder(args)
+    df1 = measure_G80(e)
+    c = PindaScanConfig.default()
+    p = PindaScan(e,
+                  config=c._replace(
+                      X=c.X._replace(num=7),
+                      Y=c.Y._replace(num=7)))
+    points = p.scan_pinda()
+    df = p.save_csv(points)
+    df1 = df1.stack().reset_index().rename(
+        columns={'level_0':'Y',
+                 'level_1':'X',
+                 0:'Z'})
+    show_heatmap(df1, title="G80 G81 report")
+    show(df)
+
 def show(df):
-    from .visualize_level import show_heatmap, plt
-    show_heatmap(df)
+    from .visualize_level import show_heatmap, show_pinda_jitter, show_XY_jitter, plt
+    show_heatmap(df, title="G30 mesh bed level probe")
+    show_pinda_jitter(df)
+    # show_XY_jitter(df)
     plt.show()
 
 def call_main():
@@ -68,4 +99,6 @@ def call_main():
         measure(args)
     elif args["show"]:
         load_and_show(args)
+    elif args["compare-G80"]:
+        compare_G80(args)
 

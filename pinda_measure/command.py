@@ -5,6 +5,7 @@ Usage:
   pinda_measure measure [options]
   pinda_measure show [<file>] [options]
   pinda_measure compare-G80 [options]
+  pinda_measure --help
 
 Options:
   -x, --xrange=<xrange>      # X range to measure [default: {default.X}]
@@ -13,6 +14,8 @@ Options:
   -c, --cycles=<cycles>      # number of measurement cycles at each temperature [default: {default.cycles}]
   --num=<num>                # change number of points for X and Y range
   --port=<port>              # Serial port of the 3d printer [default: /dev/cu.usbmodem1411]
+  --help                     # show this help
+  --version                  # print version
 
 Ranges are expressed as <start>:<end>:<num> with <num> points over the range
 <end> inclusive.
@@ -23,7 +26,7 @@ if no file is passed to show the youngest csv file in current folder is shown.
 import os
 import glob
 from docopt import docopt
-from decimal import Decimal
+from . import __version__
 from .comm import Extruder, Port
 from .pinda_temp_correction import PindaScan, PindaScanConfig, Range
 from .measure import measure_G80
@@ -94,7 +97,7 @@ def show(df):
 
 def call_main():
     args = docopt(__doc__.format(default=PindaScanConfig.default()),
-                  version='Pinda Measure v0.0')
+                  version='Pinda Measure {version}'.format(version=__version__))
     if args["measure"]:
         measure(args)
     elif args["show"]:

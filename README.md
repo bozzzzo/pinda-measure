@@ -4,6 +4,10 @@
 
         pip install git+https://github.com/bozzzzo/pinda-measure.git
 
+### Upgrade
+
+        pip install -U git+https://github.com/bozzzzo/pinda-measure.git
+
 ## Usage
 
           pinda_measure measure [options]

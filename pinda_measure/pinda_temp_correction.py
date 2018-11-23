@@ -163,5 +163,5 @@ class PindaScan:
         results = datetime.datetime.now().strftime(filename)
         df.to_csv(results, index=False)
         print("\nWrote", results)
-        return df.astype(float)
+        return df.astype(float), results
 

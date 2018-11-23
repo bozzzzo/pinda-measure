@@ -10,17 +10,25 @@ Usage:
 Options:
   -x, --xrange=<xrange>      # X range to measure [default: {default.X}]
   -y, --yrange=<yrange>      # Y range to measure [default: {default.Y}]
-  -t, --temp_range=<trange>  # Bed temperatures to measure at [default: {default.temp_range}]
-  -c, --cycles=<cycles>      # number of measurement cycles at each temperature [default: {default.cycles}]
+  -t, --temp_range=<trange>  # Bed temperatures to measure at
+                             #           [default: {default.temp_range}]
+  -c, --cycles=<cycles>      # number of measurement cycles at each temperature
+                             #           [default: {default.cycles}]
   --num=<num>                # change number of points for X and Y range
-  --port=<port>              # Serial port of the 3d printer [default: /dev/cu.usbmodem1411]
+  --port=<port>              # Serial port of the 3d printer
+                             #           [default: /dev/cu.usbmodem1411]
+  --delta-last               # show additional heatmap of change
+                             #   between this and last measurement
+  --delta=<file>             # show additional heatmap of change
+                             #   between this and specified measurement
   --help                     # show this help
   --version                  # print version
 
 Ranges are expressed as <start>:<end>:<num> with <num> points over the range
 <end> inclusive.
 
-if no file is passed to show the youngest csv file in current folder is shown.
+When no <file> is passed to show, the results of the last measurement in this
+folder are used.
 
 """
 import os
@@ -32,8 +40,7 @@ from .pinda_temp_correction import PindaScan, PindaScanConfig, Range
 from .measure import measure_G80
 
 
-def parse_config(args):
-    default = PindaScanConfig.default()
+def parse_config(args, default):
     x = Range.parse(args["--xrange"], default.X)
     y = Range.parse(args["--yrange"], default.Y)
     num = args["--num"]
@@ -51,49 +58,67 @@ def parse_config(args):
     print(config)
     return config
 
+
 def parse_extruder(args):
     return Extruder(Port(device=args["--port"], log=False))
 
+
 def measure(args):
-    config = parse_config(args)
+    config = parse_config(args, default=PindaScanConfig.default())
     e = parse_extruder(args)
     p = PindaScan(e, config=config)
     points = p.scan_pinda()
-    df = p.save_csv(points)
-    show(df)
+    df, f = p.save_csv(points)
+    show(df, args, f=f)
+
+
+def nth_youngest(n=1):
+    results = sorted(glob.glob("*.csv"), key=os.path.getmtime)
+    if len(results) < n:
+        return None
+    return results[-n]
+
 
 def load_and_show(args):
     from .visualize_level import load_df
     f = args["<file>"]
     if f is None:
-        f = sorted(glob.glob("*.csv"), key=os.path.getmtime)[-1]
+        f = nth_youngest(1)
     df = load_df(f)
-    show(df)
+    show(df, args, f=f)
+
 
 def compare_G80(args):
-    from .visualize_level import show_heatmap
+    from . import visualize_level as vl
     e = parse_extruder(args)
     df1 = measure_G80(e)
-    c = PindaScanConfig.default()
-    p = PindaScan(e,
-                  config=c._replace(
-                      X=c.X._replace(num=7),
-                      Y=c.Y._replace(num=7)))
+    if args["--num"] is None:
+        args["--num"] = "7"
+    config = parse_config(args, default=PindaScanConfig.default())
+    p = PindaScan(e, config=config)
     points = p.scan_pinda()
-    df = p.save_csv(points)
-    df1 = df1.stack().reset_index().rename(
-        columns={'level_0':'Y',
-                 'level_1':'X',
-                 0:'Z'})
-    show_heatmap(df1, title="G80 G81 report")
-    show(df)
+    df, f = p.save_csv(points)
+    vl.show_heatmap(df1, title="G80 G81 report")
+    show(df, args, f)
 
-def show(df):
-    from .visualize_level import show_heatmap, show_pinda_jitter, show_XY_jitter, plt
-    show_heatmap(df, title="G30 mesh bed level probe")
-    show_pinda_jitter(df)
+
+def show(df, args, f):
+    from . import visualize_level as vl
+    vl.show_heatmap(df, title="G30 mesh bed level probe ({})".format(f))
+    vl.show_pinda_jitter(df)
     # show_XY_jitter(df)
-    plt.show()
+    of = nth_youngest(2)
+    if args["--delta-last"] and of:
+        show_delta(df, f, of)
+    if args["--delta"] and of:
+        show_delta(df, f, args["--delta"])
+    vl.plt.show()
+
+def show_delta(df, f, of):
+    from . import visualize_level as vl
+    odf = vl.load_df(of)
+    vl.show_delta_heatmap(df, odf, title="Difference ({}) - ({})".format(f, of))
+
 
 def call_main():
     args = docopt(__doc__.format(default=PindaScanConfig.default()),

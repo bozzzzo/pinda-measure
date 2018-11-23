@@ -11,7 +11,10 @@ def measure_G80(port):
             map(lambda row: list(map(float, row)),
                 map(str.split, data[-8:-1])))))
     data = pd.DataFrame(data).round(3)
-    return data
+    return data.stack().reset_index().rename(
+        columns={'level_0':'Y',
+                 'level_1':'X',
+                 0:'Z'})
 
 
 def calibrate_linear_advance(port, k_range):

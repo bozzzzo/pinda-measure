@@ -33,3 +33,19 @@
         
         When no <file> is passed to show, the results of the last measurement in this
         folder are used.
+
+# Known Issues
+
+## --temp-range is not supported in visualizations
+
+Avoid `--temp-range` for now. Existing visualizations don't account for pinda
+temperature drift nor firmware temperature corrections so the pictures will come
+up but will probably show a jumbled mess.
+
+you can collect measurements but need to interpret the data on your own (patches
+accepted)
+
+## using homemade serial support instead of printcore
+
+seems to work for the use-case as-is. Can be adopted to printcore, at the
+expense of more complex install...

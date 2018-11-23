@@ -43,7 +43,7 @@ class Port(object):
         self.port.port = device
         self.port.baudrate = 115200
         self.port.timeout = 0.25
-        self.port.dtr = True
+        self.port.dtr = False
         self.port.open()
         self.log("port opened")
         self.port.write(";\r\n".encode("ASCII"))

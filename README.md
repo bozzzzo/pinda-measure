@@ -1,6 +1,11 @@
 # PINDA measurements of repeatability, temperature stability, bed level
 
-        Usage:
+## Installation
+
+        pip install git+https://github.com/bozzzzo/pinda-measure.git
+
+## Usage
+
           pinda_measure measure [options]
           pinda_measure show [<file>] [options]
           pinda_measure compare-G80 [options]

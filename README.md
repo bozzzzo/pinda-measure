@@ -1,4 +1,4 @@
-# PINDA measurements of repeatability, temperature stability, bed level
+PINDA measurements of repeatability, temperature stability, bed level
 
 ## Installation
 
